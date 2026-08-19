@@ -122,54 +122,6 @@ teardown() {
     unstub sudo
 }
 
-@test "homebrew_dnsmasq_mgr failed without arguments" {
-    run homebrew_dnsmasq_mgr
-    assert_failure
-}
-
-@test "homebrew_dnsmasq_mgr failed with correct argument" {
-    run homebrew_dnsmasq_mgr bad-option
-    assert_failure
-}
-
-@test "homebrew_dnsmasq_mgr succeeds on no status change" {
-    homebrew_dnsmasq_status() { echo "1"; }
-
-    run homebrew_dnsmasq_mgr "stopped"
-    assert_success
-    refute_output
-
-    homebrew_dnsmasq_status() { echo "0"; }
-
-    run homebrew_dnsmasq_mgr "running"
-    assert_success
-    refute_output
-}
-
-@test "homebrew_dnsmasq_mgr stops when running" {
-    homebrew_dnsmasq_status() { echo "0"; }
-    homebrew_dnsmasq_stop() { echo "stop called" > "${TMPDIR}/stop_called"; }
-    homebrew_dnsmasq_start() { echo "start called" > "${TMPDIR}/start_called"; }
-
-    run homebrew_dnsmasq_mgr "stopped"
-    assert_success
-    assert_output "Stopping dnsmasq"
-    assert_file_exists "${TMPDIR}/stop_called"
-    assert_file_not_exists "${TMPDIR}/start_called"
-}
-
-@test "homebrew_dnsmasq_mgr starts when stopped" {
-    homebrew_dnsmasq_status() { echo "1"; }
-    homebrew_dnsmasq_stop() { echo "stop called" > "${TMPDIR}/stop_called"; }
-    homebrew_dnsmasq_start() { echo "start called" > "${TMPDIR}/start_called"; }
-
-    run homebrew_dnsmasq_mgr "running"
-    assert_success
-    assert_output "Starting dnsmasq"
-    assert_file_exists "${TMPDIR}/start_called"
-    assert_file_not_exists "${TMPDIR}/stop_called"
-}
-
 @test "docker_status returns success if running" {
     stub docker "info : exit 0"
 
@@ -238,52 +190,78 @@ teardown() {
     unstub larakit
 }
 
-@test "larakit_mgr failed without arguments" {
-    run larakit_mgr
+@test "generic_mgr fails without arguments" {
+    run generic_mgr
     assert_failure
 }
 
-@test "larakit_mgr failed with correct argument" {
-    run larakit_mgr bad-option
+@test "generic_mgr fails with invalid need argument" {
+    run generic_mgr "prefix" "bad-need" "label"
     assert_failure
 }
 
-@test "larakit_mgr succeeds on no status change" {
-    larakit_status() { echo "1"; }
+@test "generic_mgr succeeds on no status change" {
+    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
+    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
+    fake_status() { echo "1"; }
 
-    run larakit_mgr "stopped"
+    run generic_mgr "fake" "stopped" "faker"
     assert_success
     refute_output
+    assert_file_not_exist "${TMPDIR}/stop_called"
+    assert_file_not_exist "${TMPDIR}/start_called"
 
-    larakit_status() { echo "0"; }
+    fake_status() { echo "0"; }
 
-    run larakit_mgr "running"
+    run generic_mgr "fake" "running" "faker"
     assert_success
     refute_output
+    assert_file_not_exist "${TMPDIR}/stop_called"
+    assert_file_not_exist "${TMPDIR}/start_called"
 }
 
-@test "larakit_mgr stops when running" {
-    larakit_status() { echo "0"; }
-    larakit_stop() { echo "stop called" > "${TMPDIR}/stop_called"; }
-    larakkit_start() { echo "start called" > "${TMPDIR}/start_called"; }
+@test "generic_mgr stops when running" {
+    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
+    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
+    fake_status() { echo "0"; }
 
-    run larakit_mgr "stopped"
+    run generic_mgr "fake" "stopped" "faker"
     assert_success
-    assert_output "Stopping larakit"
-    assert_file_exists "${TMPDIR}/stop_called"
-    assert_file_not_exists "${TMPDIR}/start_called"
+    assert_output "Stopping faker"
+    assert_file_exist "${TMPDIR}/stop_called"
+    assert_file_not_exist "${TMPDIR}/start_called"
 }
 
-@test "larakit_mgr starts when stopped" {
-    larakit_status() { echo "1"; }
-    larakit_stop() { echo "stop called" > "${TMPDIR}/stop_called"; }
-    larakit_start() { echo "start called" > "${TMPDIR}/start_called"; }
+@test "generic_mgr starts when stopped" {
+    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
+    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
+    fake_status() { echo "1"; }
 
-    run larakit_mgr "running"
+    run generic_mgr "fake" "running" "faker"
     assert_success
-    assert_output "Starting larakit"
-    assert_file_exists "${TMPDIR}/start_called"
-    assert_file_not_exists "${TMPDIR}/stop_called"
+    assert_output "Starting faker"
+    assert_file_not_exist "${TMPDIR}/stop_called"
+    assert_file_exist "${TMPDIR}/start_called"
+}
+
+@test "homebrew_dnsmasq_mgr calls generic_mgr correctly" {
+    generic_mgr() {
+        [ "${1}" = "homebrew_dnsmasq" ] || return 1
+        [ "{$2}" = "new-need" ] || return 1
+        [ "{$3}" = "dnsmasq" ]
+    }
+
+    run homebrew_dnsmasq_mgr "new-need"
+}
+
+@test "larakit_mgr calls generic_mgr correctly" {
+    generic_mgr() {
+        [ "${1}" = "larakit" ] || return 1
+        [ "{$2}" = "new-need" ] || return 1
+        [ "{$3}" = "larakit" ]
+    }
+
+    run larakit_mgr "new-need"
 }
 
 @test "status shows dnsmasq and larakit stopped" {
@@ -341,7 +319,7 @@ teardown() {
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_running"
-    assert_file_not_exists "$TMPDIR}/logmsg_called"
+    assert_file_not_exists "${TMPDIR}/logmsg_called"
     assert_file_exists "${TMPDIR}/larakit_running"
 }
 

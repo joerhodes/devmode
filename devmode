@@ -72,7 +72,7 @@ homebrew_dnsmasq_status() {
 #
 homebrew_dnsmasq_start() {
     sudo_will_prompt && echo "Starting dnsmasq requires your password."
-    sudo brew services start dnsmasq
+    sudo brew services start dnsmasq >/dev/null 2>&1
 }
 
 #
@@ -80,32 +80,7 @@ homebrew_dnsmasq_start() {
 #
 homebrew_dnsmasq_stop() {
     sudo_will_prompt && echo "Stopping dnsmasq requires your password."
-    sudo brew services stop dnsmasq
-}
-
-#
-# Start or stop based on need and status
-#     $1 - status requested, stopped or running
-#
-homebrew_dnsmasq_mgr() {
-    [ $# -ne 1 ] && return 1
-
-    local need="${1}"
-
-    [ "${need}" != 'stopped' ] && [ "${need}" != 'running' ] && return 1
-
-    local current="$(homebrew_dnsmasq_status)"
-
-    [ "${need}" = "stopped" ] && {
-        [ "${current}" != "0" ] && return 0
-        echo "Stopping dnsmasq"
-        homebrew_dnsmasq_stop
-        return $?
-    }
-
-    [ "${current}" = "0" ] && return 0
-    echo "Starting dnsmasq"
-    homebrew_dnsmasq_start
+    sudo brew services stop dnsmasq >/dev/null 2>&1
 }
 
 #
@@ -139,28 +114,48 @@ larakit_stop() {
 }
 
 #
-# Start or stop based on need and status
-#     $1 - status requested, stopped or running
+# Generic start/stop manager — calls <prefix>_status, <prefix>_start, <prefix>_stop
+#     $1 - prefix, e.g. "larakit" or "homebrew_dnsmasq"
+#     $2 - status requested, stopped or running
+#     $3 - display name for messages, e.g. "larakit" or "dnsmasq"
 #
-larakit_mgr() {
-    [ $# -ne 1 ] && return 1
+generic_mgr() {
+    [ $# -ne 3 ] && return 1
 
-    local need="${1}"
+    local prefix="${1}"
+    local need="${2}"
+    local label="${3}"
 
     [ "${need}" != 'stopped' ] && [ "${need}" != 'running' ] && return 1
 
-    local current="$(larakit_status)"
+    local current="$("${prefix}_status")"
 
     [ "${need}" = "stopped" ] && {
         [ "${current}" != "0" ] && return 0
-        echo "Stopping larakit"
-        larakit_stop
+        echo "Stopping ${label}"
+        "${prefix}_stop"
         return $?
     }
 
     [ "${current}" = "0" ] && return 0
-    echo "Starting larakit"
-    larakit_start
+    echo "Starting ${label}"
+    "${prefix}_start"
+}
+
+#
+# Start or stop based on need and status
+#     $1 - status requested, stopped or running
+#
+homebrew_dnsmasq_mgr() {
+    generic_mgr homebrew_dnsmasq "${1}" dnsmasq
+}
+
+#
+# Start or stop based on need and status
+#     $1 - status requested, stopped or running
+#
+larakit_mgr() {
+    generic_mgr larakit "${1}" larakit
 }
 
 #
