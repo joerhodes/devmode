@@ -1,0 +1,228 @@
+#!/usr/bin/env bash
+
+
+
+# get the directory for DEVMODE_HOME
+# DEVMODE_HOME="$(cd -- "$(dirname -- "${BATS_TEST_FILENAME}")/.." && pwd -P)"
+# DEVMODE_LIB="${DEVMODE_HOME}/lib"
+
+# source "${DEVMODE_LIB}/dnsmasq.zsh"
+# source "${DEVMODE_LIB}/larakit.zsh"
+
+#
+# Display usage
+#
+usage() {
+    printf "Usage: devmode mode\n"
+    printf "\therd\tStart the Herd development environment.\n"
+    printf "\tlarakit\tStart the larakit development environment.\n"
+    printf "\tstatus\tDisplay current devmode status.\n"
+    printf "\tstop\tStop all development environments.\n"
+}
+
+#
+# Display a message and exit
+#     $1 string - level
+#     $2 string - message
+#
+logmsg() {
+    local level=${1:-"Error"}
+    local message=${2:-"Invalid call or Unknown error"}
+    printf "%s: %s\n" "${level}" "${message}"
+    exit 1
+}
+
+#
+# Display module status
+#     $1 string - module name
+#     $2 int - module status
+#
+display_status() {
+    [ $# -eq 2 ] || return 1
+
+    local GREEN='\033[0;32m'
+    local RED='\033[0;31m'
+    local RESET='\033[0m'
+    local module="${1}"
+
+    [ "${2}" -ne 0 ] && {
+        printf "${RED}●${RESET} %s stopped\n" "${module}"
+        return 0
+    }
+
+    printf "${GREEN}●${RESET} %s running\n" "${module}"
+}
+
+#
+# Test if sudo will prompt for a password
+sudo_will_prompt() {
+    ! sudo -n true 2>/dev/null
+}
+
+#
+# Determine if Homebrew's dnsmasq process is running
+#
+homebrew_dnsmasq_status() {
+    launchctl print system/homebrew.mxcl.dnsmasq > /dev/null 2>&1
+    echo $?
+}
+
+#
+# Start Homebrew's dnsmasq service
+#
+homebrew_dnsmasq_start() {
+    sudo_will_prompt && echo "Starting dnsmasq requires your password."
+    sudo brew services start dnsmasq
+}
+
+#
+# Stop Homebrew's dnsmasq service
+#
+homebrew_dnsmasq_stop() {
+    sudo_will_prompt && echo "Stopping dnsmasq requires your password."
+    sudo brew services stop dnsmasq
+}
+
+#
+# Start or stop based on need and status
+#     $1 - status requested, stopped or running
+#
+homebrew_dnsmasq_mgr() {
+    [ $# -ne 1 ] && return 1
+
+    local need="${1}"
+
+    [ "${need}" != 'stopped' ] && [ "${need}" != 'running' ] && return 1
+
+    local current="$(homebrew_dnsmasq_status)"
+
+    [ "${need}" = "stopped" ] && {
+        [ "${current}" != "0" ] && return 0
+        echo "Stopping dnsmasq"
+        homebrew_dnsmasq_stop
+        return $?
+    }
+
+    [ "${current}" = "0" ] && return 0
+    echo "Starting dnsmasq"
+    homebrew_dnsmasq_start
+}
+
+#
+# Determine if the docker daemon is running
+#
+docker_status() {
+    docker info >/dev/null 2>&1
+    echo $?
+}
+
+#
+# Determine if Larakit's laradock containers are running
+#
+larakit_status() {
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^laradock-'
+    echo $?
+}
+
+#
+# Starts larakit
+#
+larakit_start() {
+    larakit up > /dev/null 2>&1
+}
+
+#
+# Stop larakit
+#
+larakit_stop() {
+    larakit down > /dev/null 2>&1
+}
+
+#
+# Start or stop based on need and status
+#     $1 - status requested, stopped or running
+#
+larakit_mgr() {
+    [ $# -ne 1 ] && return 1
+
+    local need="${1}"
+
+    [ "${need}" != 'stopped' ] && [ "${need}" != 'running' ] && return 1
+
+    local current="$(larakit_status)"
+
+    [ "${need}" = "stopped" ] && {
+        [ "${current}" != "0" ] && return 0
+        echo "Stopping larakit"
+        larakit_stop
+        return $?
+    }
+
+    [ "${current}" = "0" ] && return 0
+    echo "Starting larakit"
+    larakit_start
+}
+
+#
+# Display status of managed processes
+#
+status() {
+    display_status "dnsmasq" "$(homebrew_dnsmasq_status)"
+    display_status "docker" "$(docker_status)"
+    display_status "larakit" "$(larakit_status)"
+}
+
+start_herd_environment() {
+    larakit_mgr "stopped"
+    homebrew_dnsmasq_mgr "stopped"
+}
+
+start_larakit_environment() {
+    homebrew_dnsmasq_mgr "running"
+    [ "$(docker_status)" = "0" ] || {
+        logmsg "Error" "Docker Desktop is required for larakit."
+    }
+    larakit_mgr "running"
+}
+
+stop_all_environments() {
+    larakit_mgr "stopped"
+    homebrew_dnsmasq_mgr "stopped"
+}
+
+main() {
+    [ $# -ne 1 ] && {
+        usage
+        return 0
+    }
+
+    case "$1" in
+        # herd)
+        #     printf "Herd support coming soon\n"
+        #     ;;
+
+        larakit)
+            printf "Starting the Larakit environment.\n"
+            start_larakit_environment
+            ;;
+
+        stop)
+            printf "Stopping all environments.\n"
+            stop_all_environments
+            ;;
+
+        status)
+            status
+            ;;
+
+        *)
+            usage
+            ;;
+    esac
+}
+
+# Only run main when executed directly — allows this script to be sourced
+# (e.g. by BATS tests) without triggering execution.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
