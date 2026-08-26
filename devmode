@@ -114,8 +114,30 @@ larakit_stop() {
 }
 
 #
+# Determine if Herd is running
+#
+herd_status() {
+    pgrep -x Herd >/dev/null 2>&1
+    echo $?
+}
+
+#
+# Launch the Herd application
+#
+herd_start() {
+    open -a Herd
+}
+
+#
+# Stop the Herd application
+#
+herd_stop() {
+    osascript -e 'tell application "Herd" to quit' 2>/dev/null
+}
+
+#
 # Generic start/stop manager — calls <prefix>_status, <prefix>_start, <prefix>_stop
-#     $1 - prefix, e.g. "larakit" or "homebrew_dnsmasq"
+#     $1 - prefix, e.g. "larakit", "homebrew_dnsmasq" or "herd"
 #     $2 - status requested, stopped or running
 #     $3 - display name for messages, e.g. "larakit" or "dnsmasq"
 #
@@ -158,6 +180,10 @@ larakit_mgr() {
     generic_mgr larakit "${1}" larakit
 }
 
+herd_mgr() {
+    generic_mgr "herd" "${1}" "Herd"
+}
+
 #
 # Display status of managed processes
 #
@@ -165,14 +191,17 @@ status() {
     display_status "dnsmasq" "$(homebrew_dnsmasq_status)"
     display_status "docker" "$(docker_status)"
     display_status "larakit" "$(larakit_status)"
+    display_status "Herd" "$(herd_status)"
 }
 
 start_herd_environment() {
     larakit_mgr "stopped"
     homebrew_dnsmasq_mgr "stopped"
+    herd_mgr "running"
 }
 
 start_larakit_environment() {
+    herd_mgr "stopped"
     homebrew_dnsmasq_mgr "running"
     [ "$(docker_status)" = "0" ] || {
         logmsg "Error" "Docker Desktop is required for larakit."
@@ -183,6 +212,7 @@ start_larakit_environment() {
 stop_all_environments() {
     larakit_mgr "stopped"
     homebrew_dnsmasq_mgr "stopped"
+    herd_mgr "stopped"
 }
 
 main() {
@@ -192,9 +222,10 @@ main() {
     }
 
     case "$1" in
-        # herd)
-        #     printf "Herd support coming soon\n"
-        #     ;;
+        herd)
+            printf "Starting the Herd envionment.\n"
+            start_herd_environment
+            ;;
 
         larakit)
             printf "Starting the Larakit environment.\n"
