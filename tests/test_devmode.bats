@@ -190,6 +190,50 @@ teardown() {
     unstub larakit
 }
 
+@test "herd_status returns success if running" {
+    stub pgrep "-x Herd : exit 0"
+
+    run herd_status
+    assert_success
+    assert_output "0"
+}
+
+@test "herd_status returns failure if not running" {
+    stub pgrep "-x Herd : exit 1"
+
+    run herd_status
+    assert_success
+    assert_output "1"
+}
+
+@test "herd_start returns start status" {
+    stub open \
+        "-a Herd : exit 0" \
+        "-a Herd : exit 1"
+
+    run herd_start
+    assert_success
+
+    run herd_start
+    assert_failure
+
+    unstub open
+}
+
+@test "herd_stop returns stop status" {
+    stub osascript \
+        "exit 0" \
+        "exit 1"
+
+    run herd_stop
+    assert_success
+
+    run herd_stop
+    assert_failure
+
+    unstub osascript
+}
+
 @test "generic_mgr fails without arguments" {
     run generic_mgr
     assert_failure
@@ -247,28 +291,42 @@ teardown() {
 @test "homebrew_dnsmasq_mgr calls generic_mgr correctly" {
     generic_mgr() {
         [ "${1}" = "homebrew_dnsmasq" ] || return 1
-        [ "{$2}" = "new-need" ] || return 1
-        [ "{$3}" = "dnsmasq" ]
+        [ "${2}" = "new-need" ] || return 1
+        [ "${3}" = "dnsmasq" ]
     }
 
     run homebrew_dnsmasq_mgr "new-need"
+    assert_success
 }
 
 @test "larakit_mgr calls generic_mgr correctly" {
     generic_mgr() {
         [ "${1}" = "larakit" ] || return 1
-        [ "{$2}" = "new-need" ] || return 1
-        [ "{$3}" = "larakit" ]
+        [ "${2}" = "new-need" ] || return 1
+        [ "${3}" = "larakit" ]
     }
 
     run larakit_mgr "new-need"
+    assert_success
 }
 
-@test "status shows dnsmasq and larakit stopped" {
+@test "herd_mgr calls generic_mgr correctly" {
+    generic_mgr() {
+        [ "${1}" = "herd" ] || return 1
+        [ "${2}" = "new-need" ] || return 1
+        [ "${3}" = "Herd" ]
+    }
+
+    run herd_mgr "new-need"
+    assert_success
+}
+
+@test "status shows dnsmasq, larakit and Herd stopped" {
     stub launchctl "exit 1"
     stub docker \
         "info : echo 0" \
         "ps --format '{{.Names}}' : echo other-container"
+    stub pgrep "-x Herd : exit 1"
 
     run status
     assert_success
@@ -276,9 +334,11 @@ teardown() {
     assert_line --index 0 --partial "dnsmasq stopped"
     assert_line --index 1 --partial "docker running"
     assert_line --index 2 --partial "larakit stopped"
+    assert_line --index 3 --partial "Herd stopped"
 
     unstub launchctl
     unstub docker
+    unstub pgrep
 }
 
 @test "status shows dnsmasq and larakit running" {
@@ -286,6 +346,7 @@ teardown() {
     stub docker \
         "info : echo 0" \
         "ps --format '{{.Names}}' : echo laradock-workspace-1"
+    stub pgrep "-x Herd : exit 0"
 
     run status
     assert_success
@@ -293,20 +354,24 @@ teardown() {
     assert_line --index 0 --partial "dnsmasq running"
     assert_line --index 1 --partial "docker running"
     assert_line --index 2 --partial "larakit running"
+    assert_line --index 3 --partial "Herd running"
 
     unstub launchctl
     unstub docker
+    unstub pgrep
 }
 
 @test "start_herd_environment calls service managers" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
+    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
     run start_herd_environment
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_stopped"
     assert_file_exists "${TMPDIR}/larakit_stopped"
+    assert_file_exists "${TMPDIR}/herd_running"
 }
 
 @test "start_larakit_environment calls service managers" {
@@ -314,6 +379,7 @@ teardown() {
     docker_status() { echo "0"; }
     logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
+    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
     run start_larakit_environment
     assert_success
@@ -321,6 +387,7 @@ teardown() {
     assert_file_exists "${TMPDIR}/dnsmasq_running"
     assert_file_not_exists "${TMPDIR}/logmsg_called"
     assert_file_exists "${TMPDIR}/larakit_running"
+    assert_file_exists "${TMPDIR}/herd_stopped"
 }
 
 @test "start_larakit_environment logs message if docker not running" {
@@ -328,6 +395,7 @@ teardown() {
     docker_status() { echo "1"; }
     logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; exit 1; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
+    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
     run start_larakit_environment
     assert_failure
@@ -335,15 +403,18 @@ teardown() {
     assert_file_exists "${TMPDIR}/dnsmasq_running"
     assert_file_exists "${TMPDIR}/logmsg_called"
     assert_file_not_exists "${TMPDIR}/larakit_running"
+    assert_file_exists "${TMPDIR}/herd_stopped"
 }
 
 @test "stop_all_environments calls service managers" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
+    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
     run stop_all_environments
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_stopped"
     assert_file_exists "${TMPDIR}/larakit_stopped"
+    assert_file_exists "${TMPDIR}/herd_stopped"
 }
