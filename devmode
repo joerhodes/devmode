@@ -84,11 +84,34 @@ homebrew_dnsmasq_stop() {
 }
 
 #
+# Determine of the docker desktop commands are available
+#
+docker_desktop_cli_available() {
+    docker desktop version >/dev/null 2>&1
+}
+
+#
 # Determine if the docker daemon is running
 #
 docker_status() {
     docker info >/dev/null 2>&1
     echo $?
+}
+
+#
+# Start docker if CLI is available
+#
+docker_start() {
+    docker_desktop_cli_available || return 1
+    docker desktop start > /dev/null 2>&1
+}
+
+#
+# Stop docker if CLI is available
+#
+docker_stop() {
+    docker_desktop_cli_available || return 1
+    docker desktop stop > /dev/null 2>&1
 }
 
 #
@@ -165,7 +188,7 @@ generic_mgr() {
 }
 
 #
-# Start or stop based on need and status
+# Start or stop dnsmasq based on need and status
 #     $1 - status requested, stopped or running
 #
 homebrew_dnsmasq_mgr() {
@@ -173,13 +196,25 @@ homebrew_dnsmasq_mgr() {
 }
 
 #
-# Start or stop based on need and status
+# Start or stop Docker Desktop based on need and status
+#     $1 - status requested, stopped or running
+#
+docker_mgr() {
+    generic_mgr docker "${1}" "Docker Desktop"
+}
+
+#
+# Start or stop larakit based on need and status
 #     $1 - status requested, stopped or running
 #
 larakit_mgr() {
     generic_mgr larakit "${1}" larakit
 }
 
+#
+# Start or stop Herd based on need and status
+#     $1 - status requested, stopped or running
+#
 herd_mgr() {
     generic_mgr "herd" "${1}" "Herd"
 }
@@ -196,6 +231,7 @@ status() {
 
 start_herd_environment() {
     larakit_mgr "stopped"
+    docker_mgr "stopped"
     homebrew_dnsmasq_mgr "stopped"
     herd_mgr "running"
 }
@@ -203,14 +239,15 @@ start_herd_environment() {
 start_larakit_environment() {
     herd_mgr "stopped"
     homebrew_dnsmasq_mgr "running"
-    [ "$(docker_status)" = "0" ] || {
-        logmsg "Error" "Docker Desktop is required for larakit."
+    docker_mgr "running" || {
+        logmsg "Error" "Failed to start Docker Desktop."
     }
     larakit_mgr "running"
 }
 
 stop_all_environments() {
     larakit_mgr "stopped"
+    docker_mgr "stopped"
     homebrew_dnsmasq_mgr "stopped"
     herd_mgr "stopped"
 }

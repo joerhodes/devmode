@@ -122,22 +122,84 @@ teardown() {
     unstub sudo
 }
 
-@test "docker_status returns success if running" {
-    stub docker "info : exit 0"
+@test "docker_desktop_cli_available returns availability status" {
+    stub docker \
+        "desktop version : exit 0" \
+        "desktop version : exit 1"
+
+    run docker_desktop_cli_available
+    assert_success
+
+    run docker_desktop_cli_available
+    assert_failure
+
+    unstub docker
+}
+
+@test "docker_status returns info status" {
+    stub docker \
+        "info : exit 0" \
+        "info : exit 1"
 
     run docker_status
     assert_success
     assert_output "0"
 
-    unstub docker
-}
-
-@test "docker_status returns failure if not running" {
-    stub docker "info : exit 1"
-
     run docker_status
     assert_success
     assert_output "1"
+
+    unstub docker
+}
+
+@test "docker_start returns failure if cli not available" {
+    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 1; }
+
+    run docker_start
+    assert_failure
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
+}
+
+@test "docker_start returns status of docker deskstop start command" {
+    stub docker \
+        "desktop start : exit 0" \
+        "desktop start : exit 1"
+
+    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 0; }
+
+    run docker_start
+    assert_success
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
+
+    run docker_start
+    assert_failure
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
+
+    unstub docker
+}
+
+@test "docker_stop returns failure if cli not available" {
+    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 1; }
+
+    run docker_stop
+    assert_failure
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
+}
+
+@test "docker_stop returns status of docker deskstop stop command" {
+    stub docker \
+        "desktop stop : exit 0" \
+        "desktop stop : exit 1"
+
+    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 0; }
+
+    run docker_stop
+    assert_success
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
+
+    run docker_stop
+    assert_failure
+    assert_file_exists "${TMPDIR}/desktop_cli_called"
 
     unstub docker
 }
@@ -299,6 +361,17 @@ teardown() {
     assert_success
 }
 
+@test "docker_mgr calls generic_mgr correctly" {
+    generic_mgr() {
+        [ "${1}" = "docker" ] || return 1
+        [ "${2}" = "new-need" ] || return 1
+        [ "${3}" = "Docker Desktop" ]
+    }
+
+    run docker_mgr "new-need"
+    assert_success
+}
+
 @test "larakit_mgr calls generic_mgr correctly" {
     generic_mgr() {
         [ "${1}" = "larakit" ] || return 1
@@ -363,6 +436,7 @@ teardown() {
 
 @test "start_herd_environment calls service managers" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
+    docker_mgr() { echo "docker cli called" > "${TMPDIR}/docker_cli_${1:-}"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
     herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
@@ -370,13 +444,14 @@ teardown() {
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_stopped"
+    assert_file_exists "${TMPDIR}/docker_cli_stopped"
     assert_file_exists "${TMPDIR}/larakit_stopped"
     assert_file_exists "${TMPDIR}/herd_running"
 }
 
 @test "start_larakit_environment calls service managers" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_status() { echo "0"; }
+    docker_mgr() { echo "docker mgr called" > "${TMPDIR}/docker_${1:-}"; }
     logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
     herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
@@ -385,14 +460,15 @@ teardown() {
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_running"
+    assert_file_exists "${TMPDIR}/docker_running"
     assert_file_not_exists "${TMPDIR}/logmsg_called"
     assert_file_exists "${TMPDIR}/larakit_running"
     assert_file_exists "${TMPDIR}/herd_stopped"
 }
 
-@test "start_larakit_environment logs message if docker not running" {
+@test "start_larakit_environment logs message if docker fails" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_status() { echo "1"; }
+    docker_mgr() { echo "docker mgr called" > "${TMPDIR}/docker_${1:-}";  return 1; }
     logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; exit 1; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
     herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
@@ -401,6 +477,7 @@ teardown() {
     assert_failure
 
     assert_file_exists "${TMPDIR}/dnsmasq_running"
+    assert_file_exists "${TMPDIR}/docker_running"
     assert_file_exists "${TMPDIR}/logmsg_called"
     assert_file_not_exists "${TMPDIR}/larakit_running"
     assert_file_exists "${TMPDIR}/herd_stopped"
@@ -408,6 +485,7 @@ teardown() {
 
 @test "stop_all_environments calls service managers" {
     homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
+    docker_mgr() { echo "docker cli called" > "${TMPDIR}/docker_cli_${1:-}"; }
     larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
     herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
 
@@ -415,6 +493,7 @@ teardown() {
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_stopped"
+    assert_file_exists "${TMPDIR}/docker_cli_stopped"
     assert_file_exists "${TMPDIR}/larakit_stopped"
     assert_file_exists "${TMPDIR}/herd_stopped"
 }
