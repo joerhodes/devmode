@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 
 
-
-# get the directory for DEVMODE_HOME
-# DEVMODE_HOME="$(cd -- "$(dirname -- "${BATS_TEST_FILENAME}")/.." && pwd -P)"
-# DEVMODE_LIB="${DEVMODE_HOME}/lib"
-
-# source "${DEVMODE_LIB}/dnsmasq.zsh"
-# source "${DEVMODE_LIB}/larakit.zsh"
-
 #
 # Display usage
 #
@@ -260,7 +252,7 @@ main() {
 
     case "$1" in
         herd)
-            printf "Starting the Herd envionment.\n"
+            printf "Starting the Herd environment.\n"
             start_herd_environment
             ;;
 

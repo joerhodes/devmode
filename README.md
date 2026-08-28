@@ -60,7 +60,7 @@ stopped):
 To run tests, first install BATS and its helpers by running the `addTestFramework.sh` command.  
 
 ```bash
-./test/bats/bin/bats tests/
+./tests/bats/bin/bats tests/
 ```
 
 ## Known limitations
