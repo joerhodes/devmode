@@ -100,6 +100,6 @@ the pattern.
 ## Naming
 
 Commands are named after the tool (`devmode larakit`, `devmode herd`)
-rather than a role like "work"/"personal" — Herd eventually eventually
+rather than a role like "work"/"personal" — Herd may eventually
 replace larakit outright rather than stay a permanent personal-only
 counterpart, so the naming doesn't assume that split is permanent.

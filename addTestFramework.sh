@@ -10,13 +10,13 @@
 #     https://github.com/buildkite-plugins/bats-mock
 set -euo pipefail
 
-LARAKIT_HOME="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-BATS_HOME="${LARAKIT_HOME}/tests/bats"
-BATS_HELPER="${LARAKIT_HOME}/tests/helpers"
+PROJECT_HOME="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+BATS_HOME="${PROJECT_HOME}/tests/bats"
+BATS_HELPER="${PROJECT_HOME}/tests/helpers"
 CURRENT_DIR="$(pwd -P)"
 
-[ "${CURRENT_DIR}" != "${LARAKIT_HOME}" ] && {
-    printf "\nERROR: This script must be run from %s\n" "${LARAKIT_HOME}"
+[ "${CURRENT_DIR}" != "${PROJECT_HOME}" ] && {
+    printf "\nERROR: This script must be run from %s\n" "${PROJECT_HOME}"
     exit 1
 }
 
