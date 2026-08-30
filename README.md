@@ -16,7 +16,7 @@ macOS — without the two conflicting over ports and DNS.
 ## Installation
 
 ```bash
-git clone <this-repo> ~/projects/devmode
+git clone https://github.com/joerhodes/devmode.git ~/projects/devmode
 sudo ln -s ~/projects/devmode/devmode /usr/local/bin/devmode
 chmod +x ~/projects/devmode/devmode
 ```
