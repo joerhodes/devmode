@@ -444,7 +444,7 @@ teardown() {
     assert_success
 
     assert_file_exists "${TMPDIR}/dnsmasq_stopped"
-    assert_file_exists "${TMPDIR}/docker_cli_stopped"
+    assert_file_exists "${TMPDIR}/docker_cli_running"
     assert_file_exists "${TMPDIR}/larakit_stopped"
     assert_file_exists "${TMPDIR}/herd_running"
 }
