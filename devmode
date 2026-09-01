@@ -223,7 +223,9 @@ status() {
 
 start_herd_environment() {
     larakit_mgr "stopped"
-    docker_mgr "stopped"
+    docker_mgr "running" || {
+        logmsg "Error" "Failed to start Docker Desktop."
+    }
     homebrew_dnsmasq_mgr "stopped"
     herd_mgr "running"
 }

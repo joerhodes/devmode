@@ -43,7 +43,7 @@ half-switched:
 | | Brew dnsmasq | Docker Desktop | larakit | Herd |
 |---|---|---|---|---|
 | `devmode larakit` | started | started (if needed) | up | stopped |
-| `devmode herd` | stopped | stopped | down | started |
+| `devmode herd` | stopped | started | down | started |
 | `devmode stop` | stopped | stopped | down | stopped |
 
 `devmode status` prints a colored dot per service (green = running, red =
