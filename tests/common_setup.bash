@@ -6,8 +6,8 @@ _common_setup() {
 
     # get the directory for DEVMODE_HOME
     DEVMODE_HOME="$(cd -- "$(dirname -- "${BATS_TEST_FILENAME}")/.." && pwd -P)"
-    DEVMODE_LIB="${DEVMODE_HOME}/lib"
+    DEVMODE_BIN="${DEVMODE_HOME}/bin"
 
     # make sure devmode is in the path
-    PATH="${DEVMODE_HOME}:${PATH}"
+    PATH="${DEVMODE_BIN}:${PATH}"
 }
