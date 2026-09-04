@@ -1,0 +1,52 @@
+# devmode environment conf — SAMPLE / TEMPLATE
+#
+# Every environment conf must define three functions:
+#   devmode_up      — bring this environment's resources up
+#   devmode_down     — tear this environment's resources down
+#   devmode_status    — report current state of this environment's resources
+#
+# Build all three out of the shared devmode:: primitive library (brew,
+# docker, compose, app launch/quit) rather than calling brew/docker/open
+# directly — primitives are idempotent and centralize state-checking, so
+# devmode_status can reuse the exact same checks devmode_up/devmode_down
+# use internally instead of duplicating detection logic.
+
+# Resources this environment claims exclusively — i.e. must be fully
+# released (via this conf's devmode_down) before another environment that
+# also claims them can safely come up. Leave empty ("()") if this
+# environment doesn't hold anything another environment could collide with.
+DEVMODE_EXCLUSIVE=("dnsmasq")
+
+devmode_up() {
+    devmode::brew_start dnsmasq
+    devmode::app_launch "SomeApp"
+    devmode::docker_start some-container
+}
+
+devmode_down() {
+    devmode::docker_stop some-container
+    devmode::app_quit "SomeApp"
+    devmode::brew_stop dnsmasq
+}
+
+# devmode_status reports this environment's resources, one line per
+# resource, by calling the matching devmode::*_status primitive for
+# each thing devmode_up/devmode_down manage. Order should mirror
+# devmode_up so the output reads top-to-bottom the same way activation
+# does.
+#
+# Each devmode::*_status primitive prints its own "label: state" line
+# AND returns 0/1 for up/down. devmode_status prints every line
+# regardless (never short-circuits on the first down resource, so the
+# caller sees the full picture) and aggregates the return codes: 0 only
+# if every resource reported up, non-zero if any did not. Callers can
+# use the printed lines, the return code, or both — e.g. `devmode
+# status` shows the lines; drift detection can call this and check only
+# the return code.
+devmode_status() {
+    local status=0
+    devmode::brew_status dnsmasq || status=1
+    devmode::app_status "SomeApp" || status=1
+    devmode::docker_status some-container || status=1
+    return "$status"
+}
