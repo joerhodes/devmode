@@ -1,0 +1,72 @@
+# devmode environment conf — SAMPLE / TEMPLATE
+#
+# Every environment conf must define three functions:
+#   devmode_up      — bring this environment's resources up
+#   devmode_down    — tear this environment's resources down
+#   devmode_status  — report current state of this environment's resources
+#
+# Build all three out of the shared devmode:: primitive library (brew,
+# docker_desktop, docker, compose, app launch/quit) rather than calling
+# brew/docker/open directly — primitives are idempotent and centralize
+# state-checking, so devmode_status can reuse the exact same checks
+# devmode_up/devmode_down use internally instead of duplicating detection
+# logic.
+#
+# Available primitive families:
+#   devmode::app_launch / app_quit / app_status              "AppName"
+#   devmode::brew_start / brew_stop / brew_status             formula
+#   devmode::docker_desktop_launch / _quit / _status          (no args)
+#   devmode::docker_start / docker_stop / docker_status       container-name
+#   devmode::compose_up / compose_down / compose_status       path-to-compose-dir-or-file
+#
+# A conf isn't required to use devmode:: primitives for everything — if the
+# environment already has its own CLI that wraps its own compose/container
+# logic (e.g. a project's own `<toolname> up`/`<toolname> down`), call that
+# directly instead of reimplementing it. Just make sure devmode_status still
+# reports something meaningful for it (a devmode::docker_status check on one
+# of its containers is often enough).
+
+# devmode_up and devmode_down each aggregate the return codes of everything
+# they call: start with status=0, flip to 1 on any failure, but keep going
+# rather than stopping at the first error, then return the aggregate. This
+# mirrors devmode_status below and means a partial failure is reported but
+# doesn't abandon bringing up/down the rest of the environment's resources.
+devmode_up() {
+    local status=0
+    devmode::docker_desktop_launch || status=1
+    devmode::brew_start dnsmasq || status=1
+    devmode::app_launch "SomeApp" || status=1
+    devmode::compose_up "${HOME}/Containers/some-service" || status=1
+    return "$status"
+}
+
+devmode_down() {
+    local status=0
+    devmode::app_quit "SomeApp" || status=1
+    devmode::compose_down "${HOME}/Containers/some-service" || status=1
+    devmode::brew_stop dnsmasq || status=1
+    return "$status"
+}
+
+# devmode_status reports this environment's resources, one line per
+# resource, by calling the matching devmode::*_status primitive for
+# each thing devmode_up/devmode_down manage. Order should mirror
+# devmode_up so the output reads top-to-bottom the same way activation
+# does.
+#
+# Each devmode::*_status primitive prints its own "label: state" line
+# AND returns 0/1 for up/down. devmode_status prints every line
+# regardless (never short-circuits on the first down resource, so the
+# caller sees the full picture) and aggregates the return codes: 0 only
+# if every resource reported up, non-zero if any did not. Callers can
+# use the printed lines, the return code, or both — e.g. `devmode
+# status` shows the lines; drift detection can call this and check only
+# the return code.
+devmode_status() {
+    local status=0
+    devmode::docker_desktop_status || status=1
+    devmode::brew_status dnsmasq || status=1
+    devmode::app_status "SomeApp" || status=1
+    devmode::compose_status "${HOME}/Containers/some-service" || status=1
+    return "$status"
+}

@@ -17,8 +17,8 @@ macOS — without the two conflicting over ports and DNS.
 
 ```bash
 git clone https://github.com/joerhodes/devmode.git ~/projects/devmode
-sudo ln -s ~/projects/devmode/devmode /usr/local/bin/devmode
-chmod +x ~/projects/devmode/devmode
+sudo ln -s ~/projects/devmode/bin/devmode /usr/local/bin/devmode
+mkdir -p ~/.config/devmode/
 ```
 
 ### About the sudo prompt
@@ -31,10 +31,12 @@ prompt appears (e.g. "Starting dnsmasq requires your password.").
 ## Usage
 
 ```bash
-devmode larakit   # start dnsmasq + Docker Desktop + larakit, stop Herd
+devmode list       # list all available environments
+devmode larakit    # start dnsmasq + Docker Desktop + larakit, stop Herd
 devmode herd       # stop larakit + dnsmasq, start Herd
 devmode stop       # stop everything
 devmode status     # show current state of dnsmasq, Docker, larakit, and Herd
+devmode help       # show usage
 ```
 
 Each mode switch handles its stack together, so you're never left
@@ -46,13 +48,12 @@ half-switched:
 | `devmode herd` | stopped | started | down | started |
 | `devmode stop` | stopped | stopped | down | stopped |
 
-`devmode status` prints a colored dot per service (green = running, red =
-stopped):
+`devmode status` prints a colored dot per service (green = up, red = down):
 
 ```
-● dnsmasq running
-● docker running
-● larakit running
+● Docker Desktop up
+● dnsmasq up
+● laradock-workspace-1 up
 ```
 
 ## Testing
@@ -72,9 +73,5 @@ To run tests, first install BATS and its helpers by running the `addTestFramewor
 - Custom TLDs in Herd are no longer officially supported by Laravel, so this
   project assumes both larakit and Herd use the default `.test` TLD.
 - Automatic Docker Desktop start/stop requires Docker Desktop 4.37+; on
-  older versions, devmode reports that Docker needs to be started manually.
-
-## Status
-
-Working and tested. Being cleaned up for sharing with other developers.
-Not yet published.
+  older versions, `docker desktop start` is not available and Docker Desktop
+  must be started manually.

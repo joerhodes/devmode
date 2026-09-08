@@ -4,496 +4,530 @@ setup() {
 
     TMPDIR="$(mktemp -d)"
 
-    load "${DEVMODE_HOME}/devmode"
+    DEVMODE_CONFIG_DIR="$TMPDIR"
+
+    load "${DEVMODE_BIN}/devmode"
 }
 
-teardown() {
-    rm -rf "${TMPDIR}"
-}
-
-@test "usage displays usage" {
+@test "usage displays help message" {
     run usage
     assert_success
-    assert_line --index 0 "Usage: devmode mode"
-    assert_line --index 1 --regexp "[[:space:]]herd[[:space:]]Start the Herd.+"
-    assert_line --index 2 --regexp "[[:space:]]larakit[[:space:]]Start the larakit.*"
-    assert_line --index 3 --regexp "[[:space:]]status[[:space:]]Display .* status\."
-    assert_line --index 4 --regexp "[[:space:]]stop[[:space:]]Stop all .*"
+    assert_line --index 0 "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
+    assert_line --index 1 "       devmode list"
+    assert_line --index 2 "       devmode status"
+    assert_line --index 3 "       devmode stop"
 }
 
-@test "logmsg without arguments shows unknown message" {
-    run logmsg
-    assert_failure # exit code is non-zero
-
-    assert_output "Error: Invalid call or Unknown error"
-}
-
-@test "logmsg displays passed message" {
-    run logmsg "Warning" "test message"
-    assert_failure # exit code is non-zero
-
-    assert_output "Warning: test message"
-}
-
-@test "display_status fails without arguments" {
-    run display_status
-    assert_failure
-}
-
-@test "display_status shows module is running" {
-    run display_status "module" 0
+@test "display status line displays up status" {
+    run display_status_line "test" 0
     assert_success
-
-    assert_output --partial "module running"
+    assert_output --partial "test up"
 }
 
-@test "display_status shows module is stopped" {
-    run display_status "module" 1
+@test "display status line displays down status" {
+    run display_status_line "test" 1
     assert_success
-
-    assert_output --partial "module stopped"
+    assert_output --partial "test down"
 }
 
-@test "homebrew_dnsmasq_status returns success if running" {
+@test "resolve_compose_file resolves directory to docker-compose.yml" {
+    mkdir -p "${TMPDIR}/project"
+    run resolve_compose_file "${TMPDIR}/project"
+    assert_success
+    assert_output "${TMPDIR}/project/docker-compose.yml"
+}
+
+@test "devmode::brew_status displays up status" {
     stub launchctl "exit 0"
 
-    run homebrew_dnsmasq_status
+    run devmode::brew_status "test"
     assert_success
-    assert_output "0"
+    assert_output --partial "test up"
 
     unstub launchctl
 }
 
-@test "homebrew_dnsmasq_status returns failure if not running" {
+@test "devmode::brew_status displays down status" {
     stub launchctl "exit 1"
 
-    run homebrew_dnsmasq_status
-    assert_success
-    refute_output "0"
+    run devmode::brew_status "test"
+    assert_failure
+    assert_output --partial "test down"
 
     unstub launchctl
 }
 
-@test "homebrew_dnsmasq_start notifies password is needed" {
-    stub sudo \
-        "-n true : exit 1" \
-        "brew services start dnsmasq : exit 0"
+@test "devmode::brew_start succeeds if service is already running" {
+    stub launchctl "exit 0"
 
-    run homebrew_dnsmasq_start
+    run devmode::brew_start "test"
     assert_success
-    assert_output "Starting dnsmasq requires your password."
 
+    unstub launchctl
+}
+
+@test "devmode::brew_start starts service" {
+    stub launchctl "exit 1"
+    stub sudo \
+        "exit 0" \
+        "exit 0"
+
+    run devmode::brew_start "test"
+    assert_success
+
+    unstub launchctl
     unstub sudo
 }
 
-@test "homebrew_dnsmasq_start skips password notification" {
-    stub sudo \
-        "-n true : exit 0" \
-        "brew services start dnsmasq : exit 0"
+@test "devmode::brew_stop succeeds if service is already stopped" {
+    stub launchctl "exit 1"
 
-    run homebrew_dnsmasq_start
+    run devmode::brew_stop "test"
     assert_success
-    refute_output
 
+    unstub launchctl
+}
+
+@test "devmode::brew_stop stops service" {
+    stub launchctl "exit 0"
+    stub sudo \
+        "exit 0" \
+        "exit 0"
+
+    run devmode::brew_stop "test"
+    assert_success
+
+    unstub launchctl
     unstub sudo
 }
 
-@test "homebrew_dnsmasq_stop notifies password is needed" {
-    stub sudo \
-        "-n true : exit 1" \
-        "brew services stop dnsmasq : exit 0"
+@test "devmode::app_status displays up status" {
+    stub pgrep "exit 0"
 
-    run homebrew_dnsmasq_stop
+    run devmode::app_status "test"
     assert_success
-    assert_output "Stopping dnsmasq requires your password."
+    assert_output --partial "test up"
 
-    unstub sudo
+    unstub pgrep
 }
 
-@test "homebrew_dnsmasq_stop skips password notification" {
-    stub sudo \
-        "-n true : exit 0" \
-        "brew services stop dnsmasq : exit 0"
+@test "devmode::app_status displays down status" {
+    stub pgrep "exit 1"
 
-    run homebrew_dnsmasq_stop
-    assert_success
-    refute_output
-
-    unstub sudo
-}
-
-@test "docker_desktop_cli_available returns availability status" {
-    stub docker \
-        "desktop version : exit 0" \
-        "desktop version : exit 1"
-
-    run docker_desktop_cli_available
-    assert_success
-
-    run docker_desktop_cli_available
+    run devmode::app_status "test"
     assert_failure
+    assert_output --partial "test down"
 
-    unstub docker
+    unstub pgrep
 }
 
-@test "docker_status returns info status" {
-    stub docker \
-        "info : exit 0" \
-        "info : exit 1"
+@test "devmode::app_launch succeeds if app already running" {
+    stub pgrep "exit 0"
 
-    run docker_status
-    assert_success
-    assert_output "0"
-
-    run docker_status
-    assert_success
-    assert_output "1"
-
-    unstub docker
-}
-
-@test "docker_start returns failure if cli not available" {
-    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 1; }
-
-    run docker_start
-    assert_failure
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-}
-
-@test "docker_start returns status of docker deskstop start command" {
-    stub docker \
-        "desktop start : exit 0" \
-        "desktop start : exit 1"
-
-    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 0; }
-
-    run docker_start
-    assert_success
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-
-    run docker_start
-    assert_failure
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-
-    unstub docker
-}
-
-@test "docker_stop returns failure if cli not available" {
-    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 1; }
-
-    run docker_stop
-    assert_failure
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-}
-
-@test "docker_stop returns status of docker deskstop stop command" {
-    stub docker \
-        "desktop stop : exit 0" \
-        "desktop stop : exit 1"
-
-    docker_desktop_cli_available() { echo "cli available called" > "${TMPDIR}/desktop_cli_called"; return 0; }
-
-    run docker_stop
-    assert_success
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-
-    run docker_stop
-    assert_failure
-    assert_file_exists "${TMPDIR}/desktop_cli_called"
-
-    unstub docker
-}
-
-@test "larakit_status returns success if running" {
-    stub docker "ps --format '{{.Names}}' : echo laradock-workspace-1"
-
-    run larakit_status
-    assert_success
-    assert_output "0"
-
-    unstub docker
-}
-
-@test "larakit_status returns failure if not running" {
-    stub docker "ps --format '{{.Names}}' : echo other-container"
-
-    run larakit_status
-    assert_success
-    assert_output "1"
-
-    unstub docker
-}
-
-@test "larakit_start returns start status" {
-    stub larakit \
-        "up : exit 0" \
-        "up : exit 1"
-
-    run larakit_start
+    run devmode::app_launch "test"
     assert_success
 
-    run larakit_start
-    assert_failure
-
-    unstub larakit
+    unstub pgrep
 }
 
-@test "larakit_stop returns stop status" {
-    stub larakit \
-        "down : exit 0" \
-        "down : exit 1"
+@test "devmode::app_launch launches app" {
+    stub pgrep "exit 1"
+    stub open "exit 0"
 
-    run larakit_stop
+    run devmode::app_launch "test"
     assert_success
 
-    run larakit_stop
-    assert_failure
-
-    unstub larakit
-}
-
-@test "herd_status returns success if running" {
-    stub pgrep "-x Herd : exit 0"
-
-    run herd_status
-    assert_success
-    assert_output "0"
-}
-
-@test "herd_status returns failure if not running" {
-    stub pgrep "-x Herd : exit 1"
-
-    run herd_status
-    assert_success
-    assert_output "1"
-}
-
-@test "herd_start returns start status" {
-    stub open \
-        "-a Herd : exit 0" \
-        "-a Herd : exit 1"
-
-    run herd_start
-    assert_success
-
-    run herd_start
-    assert_failure
-
+    unstub pgrep
     unstub open
 }
 
-@test "herd_stop returns stop status" {
-    stub osascript \
-        "exit 0" \
-        "exit 1"
+@test "devmode::app_quit exits if app not running" {
+    stub pgrep "exit 1"
 
-    run herd_stop
+    run devmode::app_quit "test"
     assert_success
 
-    run herd_stop
-    assert_failure
+    unstub pgrep
+}
 
+@test "devmode::app_quit quits app" {
+    stub pgrep "exit 0"
+    stub osascript "exit 0"
+
+    run devmode::app_quit "test"
+    assert_success
+
+    unstub pgrep
     unstub osascript
 }
 
-@test "generic_mgr fails without arguments" {
-    run generic_mgr
-    assert_failure
-}
 
-@test "generic_mgr fails with invalid need argument" {
-    run generic_mgr "prefix" "bad-need" "label"
-    assert_failure
-}
+@test "devmode::docker_desktop_status displays up status" {
+    stub docker "exit 0"
 
-@test "generic_mgr succeeds on no status change" {
-    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
-    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
-    fake_status() { echo "1"; }
-
-    run generic_mgr "fake" "stopped" "faker"
+    run devmode::docker_desktop_status
     assert_success
-    refute_output
-    assert_file_not_exist "${TMPDIR}/stop_called"
-    assert_file_not_exist "${TMPDIR}/start_called"
+    assert_output --partial "Docker Desktop up"
 
-    fake_status() { echo "0"; }
-
-    run generic_mgr "fake" "running" "faker"
-    assert_success
-    refute_output
-    assert_file_not_exist "${TMPDIR}/stop_called"
-    assert_file_not_exist "${TMPDIR}/start_called"
-}
-
-@test "generic_mgr stops when running" {
-    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
-    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
-    fake_status() { echo "0"; }
-
-    run generic_mgr "fake" "stopped" "faker"
-    assert_success
-    assert_output "Stopping faker"
-    assert_file_exist "${TMPDIR}/stop_called"
-    assert_file_not_exist "${TMPDIR}/start_called"
-}
-
-@test "generic_mgr starts when stopped" {
-    fake_stop() { echo "fake_stop called" > "${TMPDIR}/stop_called"; }
-    fake_start() { echo "fake_start called" > "${TMPDIR}/start_called"; }
-    fake_status() { echo "1"; }
-
-    run generic_mgr "fake" "running" "faker"
-    assert_success
-    assert_output "Starting faker"
-    assert_file_not_exist "${TMPDIR}/stop_called"
-    assert_file_exist "${TMPDIR}/start_called"
-}
-
-@test "homebrew_dnsmasq_mgr calls generic_mgr correctly" {
-    generic_mgr() {
-        [ "${1}" = "homebrew_dnsmasq" ] || return 1
-        [ "${2}" = "new-need" ] || return 1
-        [ "${3}" = "dnsmasq" ]
-    }
-
-    run homebrew_dnsmasq_mgr "new-need"
-    assert_success
-}
-
-@test "docker_mgr calls generic_mgr correctly" {
-    generic_mgr() {
-        [ "${1}" = "docker" ] || return 1
-        [ "${2}" = "new-need" ] || return 1
-        [ "${3}" = "Docker Desktop" ]
-    }
-
-    run docker_mgr "new-need"
-    assert_success
-}
-
-@test "larakit_mgr calls generic_mgr correctly" {
-    generic_mgr() {
-        [ "${1}" = "larakit" ] || return 1
-        [ "${2}" = "new-need" ] || return 1
-        [ "${3}" = "larakit" ]
-    }
-
-    run larakit_mgr "new-need"
-    assert_success
-}
-
-@test "herd_mgr calls generic_mgr correctly" {
-    generic_mgr() {
-        [ "${1}" = "herd" ] || return 1
-        [ "${2}" = "new-need" ] || return 1
-        [ "${3}" = "Herd" ]
-    }
-
-    run herd_mgr "new-need"
-    assert_success
-}
-
-@test "status shows dnsmasq, larakit and Herd stopped" {
-    stub launchctl "exit 1"
-    stub docker \
-        "info : echo 0" \
-        "ps --format '{{.Names}}' : echo other-container"
-    stub pgrep "-x Herd : exit 1"
-
-    run status
-    assert_success
-
-    assert_line --index 0 --partial "dnsmasq stopped"
-    assert_line --index 1 --partial "docker running"
-    assert_line --index 2 --partial "larakit stopped"
-    assert_line --index 3 --partial "Herd stopped"
-
-    unstub launchctl
     unstub docker
-    unstub pgrep
 }
 
-@test "status shows dnsmasq and larakit running" {
-    stub launchctl "exit 0"
-    stub docker \
-        "info : echo 0" \
-        "ps --format '{{.Names}}' : echo laradock-workspace-1"
-    stub pgrep "-x Herd : exit 0"
+@test "devmode::docker_desktop_status displays down status" {
+    stub docker "exit 1"
 
-    run status
-    assert_success
-
-    assert_line --index 0 --partial "dnsmasq running"
-    assert_line --index 1 --partial "docker running"
-    assert_line --index 2 --partial "larakit running"
-    assert_line --index 3 --partial "Herd running"
-
-    unstub launchctl
-    unstub docker
-    unstub pgrep
-}
-
-@test "start_herd_environment calls service managers" {
-    homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_mgr() { echo "docker cli called" > "${TMPDIR}/docker_cli_${1:-}"; }
-    larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
-    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
-
-    run start_herd_environment
-    assert_success
-
-    assert_file_exists "${TMPDIR}/dnsmasq_stopped"
-    assert_file_exists "${TMPDIR}/docker_cli_running"
-    assert_file_exists "${TMPDIR}/larakit_stopped"
-    assert_file_exists "${TMPDIR}/herd_running"
-}
-
-@test "start_larakit_environment calls service managers" {
-    homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_mgr() { echo "docker mgr called" > "${TMPDIR}/docker_${1:-}"; }
-    logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; }
-    larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
-    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
-
-    run start_larakit_environment
-    assert_success
-
-    assert_file_exists "${TMPDIR}/dnsmasq_running"
-    assert_file_exists "${TMPDIR}/docker_running"
-    assert_file_not_exists "${TMPDIR}/logmsg_called"
-    assert_file_exists "${TMPDIR}/larakit_running"
-    assert_file_exists "${TMPDIR}/herd_stopped"
-}
-
-@test "start_larakit_environment logs message if docker fails" {
-    homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_mgr() { echo "docker mgr called" > "${TMPDIR}/docker_${1:-}";  return 1; }
-    logmsg() { echo "logmsg called" > "${TMPDIR}/logmsg_called"; exit 1; }
-    larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
-    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
-
-    run start_larakit_environment
+    run devmode::docker_desktop_status
     assert_failure
+    assert_output --partial "Docker Desktop down"
 
-    assert_file_exists "${TMPDIR}/dnsmasq_running"
-    assert_file_exists "${TMPDIR}/docker_running"
-    assert_file_exists "${TMPDIR}/logmsg_called"
-    assert_file_not_exists "${TMPDIR}/larakit_running"
-    assert_file_exists "${TMPDIR}/herd_stopped"
+    unstub docker
 }
 
-@test "stop_all_environments calls service managers" {
-    homebrew_dnsmasq_mgr() { echo "dnsmasq mgr called" > "${TMPDIR}/dnsmasq_${1:-}"; }
-    docker_mgr() { echo "docker cli called" > "${TMPDIR}/docker_cli_${1:-}"; }
-    larakit_mgr() { echo "larakit mgr called" > "${TMPDIR}/larakit_${1:-}"; }
-    herd_mgr() { echo "herd mgr called" > "${TMPDIR}/herd_${1:-}"; }
+@test "devmode::docker_desktop_launch succeeds when Docker Desktop is already running" {
+    stub docker "info : exit 0"
 
-    run stop_all_environments
+    run devmode::docker_desktop_launch
     assert_success
 
-    assert_file_exists "${TMPDIR}/dnsmasq_stopped"
-    assert_file_exists "${TMPDIR}/docker_cli_stopped"
-    assert_file_exists "${TMPDIR}/larakit_stopped"
-    assert_file_exists "${TMPDIR}/herd_stopped"
+    unstub docker
+}
+
+@test "devmode::docker_desktop_launch starts Docker Desktop" {
+    stub docker \
+        "info : exit 1" \
+        "desktop start : exit 0"
+
+    run devmode::docker_desktop_launch
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_desktop_quit succeeds when Docker Desktop is not running" {
+    stub docker "info : exit 1"
+
+    run devmode::docker_desktop_quit
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_desktop_quit quits Docker Desktop" {
+    stub docker \
+        "info : exit 0" \
+        "desktop stop : exit 0"
+
+    run devmode::docker_desktop_quit
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_status displays container is up" {
+    stub docker \
+        "exit 0" \
+        "echo true"
+
+    devmode::docker_desktop_status &> /dev/null
+    run devmode::docker_status "test"
+    assert_success
+    assert_output --partial "test up"
+
+    unstub docker
+}
+
+@test "devmode::docker_status displays container is down" {
+    stub docker \
+        "exit 0" \
+        "echo error: no such object: test"
+
+    devmode::docker_desktop_status &> /dev/null
+    run devmode::docker_status "test"
+    assert_failure
+    assert_output --partial "test down"
+
+    unstub docker
+}
+
+@test "devmode::docker_start succeeds when container is already running" {
+    devmode::docker_desktop_launch() { return 0; }
+    stub docker \
+        "inspect -f '{{.State.Running}}' test : echo true"
+
+    run devmode::docker_start "test"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_start starts container" {
+    devmode::docker_desktop_launch() { return 0; }
+    stub docker \
+        "inspect -f '{{.State.Running}}' test  : echo false" \
+        "start test : exit 0"
+
+    run devmode::docker_start "test"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_stop succeeds when container is not running" {
+    stub docker \
+        "inspect -f '{{.State.Running}}' test  : echo false"
+
+    run devmode::docker_stop "test"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode::docker_stop fails when container is running" {
+    stub docker \
+        "inspect -f '{{.State.Running}}' test  : echo true" \
+        "stop test : exit 0"
+
+    run devmode::docker_stop "test"
+    assert_success
+
+    unstub docker
+}
+
+# bats test_tags=bats:focus
+@test "devmode::compose_status reports project is running" {
+    display_status_line() { printf "%s %d\n" "$1" "$2"; }
+    mkdir -p "${TMPDIR}/project"
+    stub docker \
+        "compose -f ${TMPDIR}/project/docker-compose.yml ps --status running -q : echo test"
+
+    run devmode::compose_status "${TMPDIR}/project"
+    assert_success
+    assert_output "project 0"
+
+    unstub docker
+}
+
+# bats test_tags=bats:focus
+@test "devmode::compose_status reports project is not running" {
+    display_status_line() { printf "%s %d\n" "$1" "$2"; }
+    mkdir -p "${TMPDIR}/project"
+    stub docker \
+        "compose -f ${TMPDIR}/project/docker-compose.yml ps --status running -q : exit 0"
+
+    run devmode::compose_status "${TMPDIR}/project"
+    assert_failure
+    assert_output "project 1"
+
+    unstub docker
+}
+
+@test "devmode:compose_up succeeds if project running" {
+    devmode::docker_desktop_launch() { return 0; }
+    stub docker \
+        "compose -f project/test.yml ps --status running -q : echo test"
+
+    run devmode::compose_up "project/test.yml"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode:compose_up starts project if not running" {
+    devmode::docker_desktop_launch() { return 0; }
+    stub docker \
+        "compose -f project/test.yml ps --status running -q : exit 0" \
+        "compose -f project/test.yml up -d : exit 0"
+
+    run devmode::compose_up "project/test.yml"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode:compose_down succeeds if project not running" {
+    stub docker \
+        "compose -f project/test.yml ps --status running -q : exit 0"
+
+    run devmode::compose_down "project/test.yml"
+    assert_success
+
+    unstub docker
+}
+
+@test "devmode:compose_down stops project if not running" {
+    stub docker \
+        "compose -f project/test.yml ps --status running -q : echo test" \
+        "compose -f project/test.yml down : exit 0"
+
+    run devmode::compose_down "project/test.yml"
+    assert_success
+
+    unstub docker
+}
+
+@test "list_environments lists available environments" {
+    touch "$DEVMODE_CONFIG_DIR/test1.conf"
+    touch "$DEVMODE_CONFIG_DIR/test2.conf"
+    run list_environments
+    assert_success
+    assert_output --partial "test1"
+    assert_output --partial "test2"
+}
+
+@test "list_environments lists no environments" {
+    run list_environments
+    assert_success
+    assert_output --partial ""
+}
+
+@test "display_environments lists available environments" {
+    touch "$DEVMODE_CONFIG_DIR/test1.conf"
+    touch "$DEVMODE_CONFIG_DIR/test2.conf"
+    run display_environments
+    assert_success
+    assert_output --partial "test1"
+    assert_output --partial "test2"
+}
+
+@test "display_environments shows no environments found" {
+    run display_environments
+    assert_failure
+    assert_output --partial "No environments found in $DEVMODE_CONFIG_DIR"
+}
+
+@test "display_statuses shows no environments found" {
+    run display_statuses
+    assert_failure
+    assert_output --partial "No environments found in $DEVMODE_CONFIG_DIR"
+}
+
+@test "display_statuses lists available statuses" {
+    echo "
+    devmode_status() {
+        echo "test component up"
+        return 0
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+
+    run display_statuses
+    assert_success
+    assert_output --partial "test:"
+    assert_output --partial "test component up"
+}
+
+@test "active_environments lists active environments" {
+    echo "
+    devmode_status() {
+        echo "test component up"
+        return 0
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    run active_environments
+    assert_success
+    assert_output --partial "test"
+}
+
+@test "active_environments lists multiple active environments" {
+    echo "
+    devmode_status() {
+        echo "test component up"
+        return 0
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    echo "
+    devmode_status() {
+        echo "test2 component up"
+        return 0
+    }
+    " > "$DEVMODE_CONFIG_DIR/test2.conf"
+    run active_environments
+    assert_success
+    assert_output --partial "test"
+    assert_output --partial "test2"
+}
+
+@test "active_environments lists no active environments" {
+    echo "
+    devmode_status() {
+        echo "test component down"
+        return 1
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    run active_environments
+    assert_success
+    assert_output ""
+}
+
+@test "stop_environments reports no active environments" {
+    echo "
+    devmode_status() {
+        echo "test component down"
+        return 1
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    run stop_environments
+    assert_success
+    assert_output "No environments currently active."
+}
+
+@test "stop_environments stops active environments" {
+    echo "
+    devmode_status() {
+        echo "test component up"
+        return 0
+    }
+    devmode_down() {
+        return 0
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    run stop_environments
+    assert_success
+    assert_output "Stopping test..."
+}
+
+@test "stop_environments warns when dev_down fails" {
+    echo "
+    devmode_status() {
+        echo "test component up"
+        return 0
+    }
+    devmode_down() {
+        return 1
+    }
+    " > "$DEVMODE_CONFIG_DIR/test.conf"
+    run stop_environments
+    assert_failure
+    assert_output --partial "Stopping test..."
+    assert_output --partial "Warning: devmode_down for test did not exit cleanly."
+}
+
+@test "switch_environment short circuits when target is active" {
+    active_environments() { printf "test\n"; }
+    run switch_environment "test"
+    assert_success
+    assert_output "test is already active — nothing to do."
+}
+
+@test "switch_environment reports error when stopping environments fails" {
+    stop_environments() { return 1; }
+    run switch_environment "test"
+    assert_failure
+    assert_output --partial "Failed to stop currently active environment(s)"
+    assert_output --partial "aborting switch to test."
+}
+
+@test "switch_environment stops environments and switches to target" {
+    stop_environments() { return 0; }
+    devmode_up() { return 0; }
+    run switch_environment "test"
+    assert_success
+    assert_output --partial "Starting test..."
+}
+
+@test "switch_environment reports error when devmode_up fails" {
+    stop_environments() { return 0; }
+    devmode_up() { return 1; }
+    run switch_environment "test"
+    assert_failure
+    assert_output --partial "Starting test..."
+    assert_output --partial "devmode_up for test did not exit cleanly."
 }

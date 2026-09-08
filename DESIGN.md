@@ -1,105 +1,97 @@
-# devmode — Design Notes
+# devmode v2 — Design
 
-Rationale and implementation decisions behind devmode, for anyone reviewing
-or extending the code. Day-to-day usage is covered in README.md; this file
-is about *why* it's built this way.
+## Purpose
 
-## Why this exists
+`devmode` toggles a Mac between isolated development environments (currently
+Herd/personal and larakit/work), coordinating whatever services, apps, and
+system daemons each environment needs — without them conflicting with each
+other on shared resources (ports, dnsmasq, etc).
 
-Both larakit (a Laradock wrapper used for work projects under `~/Sites`) and
-Laravel Herd (used for personal Laravel projects, kept in a separate
-directory) provide their own PHP, Composer, nginx, and dnsmasq. Run both at
-once and you get collisions:
+v1 was a zsh-then-bash script with mode names hardcoded into the dispatch
+logic and a fixed idea of "services to start/stop." v2 redesigns around two
+ideas: **discoverable environments** (adding a new one is a new file, not a
+script change) and **command primitives** (each environment composes small,
+idempotent wrapper functions rather than the script knowing about Docker
+specifically).
 
-- **Port 80/443** — both want to bind them.
-- **`.test` domain resolution** — Homebrew's dnsmasq (used by larakit) and
-  Herd's bundled dnsmasq both try to own `*.test`, and whichever one is
-  active determines what actually resolves.
-- **The Docker daemon** — larakit needs Docker Desktop running; nothing
-  should have to remember to check that by hand.
+## Core concepts
 
-devmode gives one command to declare which environment you want, and
-handles bringing the right stack up and the other one fully down — Docker
-Desktop, dnsmasq, larakit's containers, and Herd together — so you're never
-left in a half-switched state.
+### Environments are files, not code
 
-## Standalone script, not a sourced library
-
-Early versions of devmode were built as sourced zsh functions, on the
-assumption that PHP/Composer PATH switching would need to happen in the
-calling shell. That need never materialized — Herd's own `php`/`composer`
-aliasing handles that separately — and `devmode status` derives everything
-from live process/container state rather than shell state. So there's
-nothing here that actually requires being sourced. A standalone script is
-easier to test with BATS and more portable than a zsh-specific sourced
-library.
-
-## Why installed system-wide (`/usr/local/bin`), not per-user
-
-The dnsmasq service devmode manages is a system-level LaunchDaemon — there's
-only one instance of it on the machine, shared across any logins, not
-something each user account could have its own copy of. Adding devmode to a
-single user's `PATH` (as would make sense for a purely per-user tool) would
-be misleading given the resource it manages isn't per-user. `sudo` is only
-needed for the one-time symlink step; day-to-day use doesn't require it
-aside from the dnsmasq start/stop calls, which explain themselves at the
-point they prompt.
-
-## How status checks work
-
-- **Homebrew's dnsmasq** — Homebrew's and Herd's dnsmasq are both processes
-  literally named `dnsmasq`, so a plain `pgrep dnsmasq` can't tell them
-  apart. devmode checks Homebrew's specifically by its LaunchDaemon label:
-  `launchctl print system/homebrew.mxcl.dnsmasq`. This only matches the
-  Homebrew-managed system LaunchDaemon, not Herd's bundled dnsmasq binary,
-  which isn't registered under a `homebrew.mxcl.*` label.
-- **Docker** — `docker info` confirms the daemon is actually responding, not
-  just that some process exists.
-- **larakit** — checked by looking for running containers named with the
-  `laradock-` prefix.
-
-## Starting Docker Desktop and Herd
-
-- **Docker Desktop** — if `docker desktop` CLI commands are available
-  (4.37+), devmode uses `docker desktop start`/`stop` to manage it. These
-  commands block until the operation completes, so devmode doesn't need to
-  poll or wait afterward. On older Docker Desktop versions without this CLI,
-  devmode reports that Docker needs to be started manually instead of
-  attempting to launch it.
-- **Herd** — started with `open -a Herd`. Unlike `docker desktop start`,
-  `open` returns as soon as the launch is requested, not once Herd is
-  actually ready. Nothing in devmode currently depends on Herd being
-  immediately usable after `devmode herd` returns, so this is intentional
-  and not polled.
-
-## Shared start/stop logic
-
-`larakit_mgr` and `homebrew_dnsmasq_mgr` follow the same "compare requested
-state to current state, start or stop as needed" shape. That shared logic
-lives in one place (`generic_mgr`) and is called with a prefix identifying
-which set of `_status`/`_start`/`_stop` functions to use, rather than being
-duplicated per service.
-
-## Testability
-
-`main` is guarded so the script can be sourced by BATS without triggering
-real execution:
+An environment is a `.conf` file in `~/.config/devmode/` that defines three
+bash functions:
 
 ```bash
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
-fi
+devmode_up()     { ... }
+devmode_down()   { ... }
+devmode_status() { ... }
 ```
 
-Tests stub external commands (`docker`, `launchctl`, `sudo`, `open`) at the
-boundary and override internal functions (e.g. `larakit_status`,
-`homebrew_dnsmasq_start`) directly to test branching logic in isolation from
-the functions it calls — see `larakit_mgr`/`homebrew_dnsmasq_mgr` tests for
-the pattern.
+`devmode <name>` sources `<name>.conf` and calls `devmode_up`. The script
+itself never hardcodes environment names — it discovers available modes by
+globbing `*.conf` in the config directory. Adding a third environment (e.g.
+a future DDEV-based stack) means dropping in a new conf file, not editing
+the dispatch script.
 
-## Naming
+`example.conf.sample` ships as a documented template but is **not** sourced
+as a mode (see Repo Layout) — its extension deliberately doesn't match the
+`*.conf` glob so it can't accidentally appear as a selectable environment.
 
-Commands are named after the tool (`devmode larakit`, `devmode herd`)
-rather than a role like "work"/"personal" — Herd may eventually
-replace larakit outright rather than stay a permanent personal-only
-counterpart, so the naming doesn't assume that split is permanent.
+### Command primitives (the `devmode::` namespace)
+
+Each environment's `devmode_up`/`devmode_down` is composed from a small,
+shared library of wrapper functions, namespaced with `devmode::` (a bash
+naming convention, not special syntax — it just reads as module/class
+scoping and makes `grep -r "devmode::"` find every primitive).
+
+Primitives wrap the small set of tools environments actually need:
+
+- `devmode::brew_start` / `devmode::brew_stop` / `devmode::brew_status` — Homebrew services (e.g. dnsmasq)
+- `devmode::app_launch` / `devmode::app_quit` / `devmode::app_status` — GUI apps via `open` / `osascript`
+- `devmode::docker_desktop_launch` / `devmode::docker_desktop_quit` / `devmode::docker_desktop_status` — Docker Desktop itself
+- `devmode::docker_start` / `devmode::docker_stop` / `devmode::docker_status` — standalone containers
+- `devmode::compose_up` / `devmode::compose_down` / `devmode::compose_status` — docker-compose stacks
+
+**All primitives are idempotent.** Each checks current state before acting
+(`pgrep`, `docker inspect`, `brew services list`, `docker compose ps`) and
+only acts if the desired state isn't already met. This means:
+
+- `devmode_up`/`devmode_down` are safe to call redundantly or out of order.
+- The same state-check used by each primitive doubles as the basis for
+  `devmode status` — status reporting and actuation share detection logic
+  rather than duplicating it (e.g. `devmode::app_running` is called by both
+  `devmode::app_launch` and the status reporter).
+
+## Repo layout
+
+```
+devmode/
+├── bin/
+│   └── devmode                 # dispatch script + devmode:: primitives library
+├── environments/
+│   ├── herd.conf.sample         # baseline: Herd + Mailpit + local Forgejo
+│   ├── larakit.conf.sample      # baseline: larakit compose stack + dnsmasq
+│   └── example.conf.sample      # documented template; NOT globbed as a mode
+├── README.md
+└── tests/
+    └── *.bats
+```
+
+## Herd baseline environment (services)
+
+Since Herd Pro (with its built-in mail trap) isn't planned, Herd mode
+needs local equivalents:
+
+- **Mailpit** (`axllent/mailpit` Docker image) — SMTP capture + web UI,
+  replaces Herd Pro's built-in trap / the team's Mailtrap usage at work.
+  SMTP on `1025`, UI on `8025`.
+- **local Forgejo** — self-hosted git, personal-side.
+
+Both are personal/Herd-side tools, not work/larakit-side — work already has
+Mailtrap and Bitbucket handled independently of devmode.
+
+## Still open / deferred
+
+- `devmode status` output format — per-service state today; should extend
+  to cross-environment exclusive-resource ownership as environment count
+  grows.
