@@ -18,12 +18,13 @@ specifically).
 
 ### Environments are files, not code
 
-An environment is a `.conf` file in `~/.config/devmode/` that defines two
+An environment is a `.conf` file in `~/.config/devmode/` that defines three
 bash functions:
 
 ```bash
-devmode_up()   { ... }
-devmode_down() { ... }
+devmode_up()     { ... }
+devmode_down()   { ... }
+devmode_status() { ... }
 ```
 
 `devmode <name>` sources `<name>.conf` and calls `devmode_up`. The script
@@ -45,10 +46,11 @@ scoping and makes `grep -r "devmode::"` find every primitive).
 
 Primitives wrap the small set of tools environments actually need:
 
-- `devmode::brew_start` / `devmode::brew_stop` — Homebrew services (e.g. dnsmasq)
-- `devmode::app_launch` / `devmode::app_quit` — GUI apps via `open` / `osascript`
-- `devmode::docker_start` / `devmode::docker_stop` — standalone containers
-- `devmode::compose_up` / `devmode::compose_down` — docker-compose stacks
+- `devmode::brew_start` / `devmode::brew_stop` / `devmode::brew_status` — Homebrew services (e.g. dnsmasq)
+- `devmode::app_launch` / `devmode::app_quit` / `devmode::app_status` — GUI apps via `open` / `osascript`
+- `devmode::docker_desktop_launch` / `devmode::docker_desktop_quit` / `devmode::docker_desktop_status` — Docker Desktop itself
+- `devmode::docker_start` / `devmode::docker_stop` / `devmode::docker_status` — standalone containers
+- `devmode::compose_up` / `devmode::compose_down` / `devmode::compose_status` — docker-compose stacks
 
 **All primitives are idempotent.** Each checks current state before acting
 (`pgrep`, `docker inspect`, `brew services list`, `docker compose ps`) and
@@ -90,9 +92,6 @@ Mailtrap and Bitbucket handled independently of devmode.
 
 ## Still open / deferred
 
-- Exact schema and inline documentation for `example.conf.sample`.
-- Whether Herd-side services become a small compose file (for primitive
-  symmetry with larakit) or stay standalone `docker run` containers.
 - `devmode status` output format — per-service state today; should extend
   to cross-environment exclusive-resource ownership as environment count
   grows.
