@@ -36,6 +36,7 @@ devmode larakit    # start dnsmasq + Docker Desktop + larakit, stop Herd
 devmode herd       # stop larakit + dnsmasq, start Herd
 devmode stop       # stop everything
 devmode status     # show current state of dnsmasq, Docker, larakit, and Herd
+devmode help       # show usage
 ```
 
 Each mode switch handles its stack together, so you're never left
@@ -47,13 +48,12 @@ half-switched:
 | `devmode herd` | stopped | started | down | started |
 | `devmode stop` | stopped | stopped | down | stopped |
 
-`devmode status` prints a colored dot per service (green = running, red =
-stopped):
+`devmode status` prints a colored dot per service (green = up, red = down):
 
 ```
-● Docker Desktop running
-● dnsmasq running
-● laradock-workspace-1 running
+● Docker Desktop up
+● dnsmasq up
+● laradock-workspace-1 up
 ```
 
 ## Testing
@@ -73,4 +73,5 @@ To run tests, first install BATS and its helpers by running the `addTestFramewor
 - Custom TLDs in Herd are no longer officially supported by Laravel, so this
   project assumes both larakit and Herd use the default `.test` TLD.
 - Automatic Docker Desktop start/stop requires Docker Desktop 4.37+; on
-  older versions, devmode reports that Docker needs to be started manually.
+  older versions, `docker desktop start` is not available and Docker Desktop
+  must be started manually.
