@@ -1,2 +1,4 @@
+.DS_Store
 tests/bats
 tests/helpers
+environments/*.conf

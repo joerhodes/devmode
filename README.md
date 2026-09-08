@@ -17,8 +17,8 @@ macOS — without the two conflicting over ports and DNS.
 
 ```bash
 git clone https://github.com/joerhodes/devmode.git ~/projects/devmode
-sudo ln -s ~/projects/devmode/devmode /usr/local/bin/devmode
-chmod +x ~/projects/devmode/devmode
+sudo ln -s ~/projects/devmode/bin/devmode /usr/local/bin/devmode
+mkdir -p ~/.config/devmode/
 ```
 
 ### About the sudo prompt
@@ -31,7 +31,8 @@ prompt appears (e.g. "Starting dnsmasq requires your password.").
 ## Usage
 
 ```bash
-devmode larakit   # start dnsmasq + Docker Desktop + larakit, stop Herd
+devmode list       # list all available environments
+devmode larakit    # start dnsmasq + Docker Desktop + larakit, stop Herd
 devmode herd       # stop larakit + dnsmasq, start Herd
 devmode stop       # stop everything
 devmode status     # show current state of dnsmasq, Docker, larakit, and Herd
@@ -50,9 +51,9 @@ half-switched:
 stopped):
 
 ```
+● Docker Desktop running
 ● dnsmasq running
-● docker running
-● larakit running
+● laradock-workspace-1 running
 ```
 
 ## Testing
@@ -73,8 +74,3 @@ To run tests, first install BATS and its helpers by running the `addTestFramewor
   project assumes both larakit and Herd use the default `.test` TLD.
 - Automatic Docker Desktop start/stop requires Docker Desktop 4.37+; on
   older versions, devmode reports that Docker needs to be started manually.
-
-## Status
-
-Working and tested. Being cleaned up for sharing with other developers.
-Not yet published.

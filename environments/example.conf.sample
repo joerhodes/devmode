@@ -2,31 +2,50 @@
 #
 # Every environment conf must define three functions:
 #   devmode_up      — bring this environment's resources up
-#   devmode_down     — tear this environment's resources down
-#   devmode_status    — report current state of this environment's resources
+#   devmode_down    — tear this environment's resources down
+#   devmode_status  — report current state of this environment's resources
 #
 # Build all three out of the shared devmode:: primitive library (brew,
-# docker, compose, app launch/quit) rather than calling brew/docker/open
-# directly — primitives are idempotent and centralize state-checking, so
-# devmode_status can reuse the exact same checks devmode_up/devmode_down
-# use internally instead of duplicating detection logic.
+# docker_desktop, docker, compose, app launch/quit) rather than calling
+# brew/docker/open directly — primitives are idempotent and centralize
+# state-checking, so devmode_status can reuse the exact same checks
+# devmode_up/devmode_down use internally instead of duplicating detection
+# logic.
+#
+# Available primitive families:
+#   devmode::app_launch / app_quit / app_status              "AppName"
+#   devmode::brew_start / brew_stop / brew_status             formula
+#   devmode::docker_desktop_launch / _quit / _status          (no args)
+#   devmode::docker_start / docker_stop / docker_status       container-name
+#   devmode::compose_up / compose_down / compose_status       path-to-compose-dir-or-file
+#
+# A conf isn't required to use devmode:: primitives for everything — if the
+# environment already has its own CLI that wraps its own compose/container
+# logic (e.g. a project's own `<toolname> up`/`<toolname> down`), call that
+# directly instead of reimplementing it. Just make sure devmode_status still
+# reports something meaningful for it (a devmode::docker_status check on one
+# of its containers is often enough).
 
-# Resources this environment claims exclusively — i.e. must be fully
-# released (via this conf's devmode_down) before another environment that
-# also claims them can safely come up. Leave empty ("()") if this
-# environment doesn't hold anything another environment could collide with.
-DEVMODE_EXCLUSIVE=("dnsmasq")
-
+# devmode_up and devmode_down each aggregate the return codes of everything
+# they call: start with status=0, flip to 1 on any failure, but keep going
+# rather than stopping at the first error, then return the aggregate. This
+# mirrors devmode_status below and means a partial failure is reported but
+# doesn't abandon bringing up/down the rest of the environment's resources.
 devmode_up() {
-    devmode::brew_start dnsmasq
-    devmode::app_launch "SomeApp"
-    devmode::docker_start some-container
+    local status=0
+    devmode::docker_desktop_launch || status=1
+    devmode::brew_start dnsmasq || status=1
+    devmode::app_launch "SomeApp" || status=1
+    devmode::compose_up "${HOME}/Containers/some-service" || status=1
+    return "$status"
 }
 
 devmode_down() {
-    devmode::docker_stop some-container
-    devmode::app_quit "SomeApp"
-    devmode::brew_stop dnsmasq
+    local status=0
+    devmode::app_quit "SomeApp" || status=1
+    devmode::compose_down "${HOME}/Containers/some-service" || status=1
+    devmode::brew_stop dnsmasq || status=1
+    return "$status"
 }
 
 # devmode_status reports this environment's resources, one line per
@@ -45,8 +64,9 @@ devmode_down() {
 # the return code.
 devmode_status() {
     local status=0
+    devmode::docker_desktop_status || status=1
     devmode::brew_status dnsmasq || status=1
     devmode::app_status "SomeApp" || status=1
-    devmode::docker_status some-container || status=1
+    devmode::compose_status "${HOME}/Containers/some-service" || status=1
     return "$status"
 }
