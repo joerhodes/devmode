@@ -10,7 +10,3 @@
   `status` should degrade gracefully and report what's missing rather than
   erroring; `larakit`/`stop` can fail outright on a missing hard dependency.
 
-- **Document the bats-file fork dependency.** `addTestFramework.sh` installs
-  from `bats-core/bats-file`, not the original `ztombol/bats-file` — the two
-  have diverged (e.g. `assert_*_exists` aliases only exist in the fork).
-  Note this is deliberate, not something to "fix."
