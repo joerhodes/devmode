@@ -6,7 +6,7 @@ macOS — without the two conflicting over ports and DNS.
 
 ## Requirements
 
-- macOS with [Homebrew](https://brew.sh)
+- macOS with [Homebrew](https://brew.sh) set up on a non-privileged port
 - larakit installed and configured for work projects
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/), ideally
   4.37+ for automatic start/stop support
@@ -20,13 +20,6 @@ git clone https://github.com/joerhodes/devmode.git ~/projects/devmode
 sudo ln -s ~/projects/devmode/bin/devmode /usr/local/bin/devmode
 mkdir -p ~/.config/devmode/
 ```
-
-### About the sudo prompt
-
-Homebrew's dnsmasq binds port 53, a privileged port, so starting/stopping it
-requires `sudo`. `devmode` prints a short message explaining why before the
-prompt appears (e.g. "Starting dnsmasq requires your password.").
-
 
 ## Usage
 

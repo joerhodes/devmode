@@ -68,15 +68,13 @@ setup() {
 
 @test "devmode::brew_start starts service" {
     stub launchctl "exit 1"
-    stub sudo \
-        "exit 0" \
-        "exit 0"
+    stub brew "services start test : exit 0"
 
     run devmode::brew_start "test"
     assert_success
 
     unstub launchctl
-    unstub sudo
+    unstub brew
 }
 
 @test "devmode::brew_stop succeeds if service is already stopped" {
@@ -90,15 +88,13 @@ setup() {
 
 @test "devmode::brew_stop stops service" {
     stub launchctl "exit 0"
-    stub sudo \
-        "exit 0" \
-        "exit 0"
+    stub brew "services stop test : exit 0"
 
     run devmode::brew_stop "test"
     assert_success
 
     unstub launchctl
-    unstub sudo
+    unstub brew
 }
 
 @test "devmode::app_status displays up status" {
@@ -292,7 +288,6 @@ setup() {
     unstub docker
 }
 
-# bats test_tags=bats:focus
 @test "devmode::compose_status reports project is running" {
     display_status_line() { printf "%s %d\n" "$1" "$2"; }
     mkdir -p "${TMPDIR}/project"
@@ -306,7 +301,6 @@ setup() {
     unstub docker
 }
 
-# bats test_tags=bats:focus
 @test "devmode::compose_status reports project is not running" {
     display_status_line() { printf "%s %d\n" "$1" "$2"; }
     mkdir -p "${TMPDIR}/project"

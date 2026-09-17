@@ -53,13 +53,6 @@ display_status_line() {
 }
 
 #
-# sudo_will_prompt — check if sudo will prompt for a password
-#
-sudo_will_prompt() {
-    ! sudo -n true 2>/dev/null
-}
-
-#
 # resolve_compose_file — resolve a docker-compose.yml path or directory to the actual compose file path
 #     $1 — path to docker-compose.yml or directory
 #
@@ -83,7 +76,7 @@ resolve_compose_file() {
 #
 devmode::brew_status() {
     local service="$1"
-    if launchctl print "system/homebrew.mxcl.${service}" &>/dev/null; then
+    if launchctl print "gui/${UID}/sh.brew.${service}" &>/dev/null; then
         display_status_line "$service" 0
         return 0
     else
@@ -99,14 +92,11 @@ devmode::brew_status() {
 devmode::brew_start() {
     local service="$1"
 
-    if launchctl print "system/homebrew.mxcl.${service}" &>/dev/null; then
+    if launchctl print "gui/${UID}/sh.brew.${service}" &>/dev/null; then
         return 0
     fi
 
-    if sudo_will_prompt; then
-        echo "Starting ${service} requires sudo — you may be prompted for your password."
-    fi
-    sudo brew services start "$service" 2>/dev/null
+    brew services start "$service" 2>/dev/null
 }
 
 #
@@ -116,14 +106,11 @@ devmode::brew_start() {
 devmode::brew_stop() {
     local service="$1"
 
-    if ! launchctl print "system/homebrew.mxcl.${service}" &>/dev/null; then
+    if ! launchctl print "gui/${UID}/sh.brew.${service}" &>/dev/null; then
         return 0
     fi
 
-    if sudo_will_prompt; then
-        echo "Stopping ${service} requires sudo — you may be prompted for your password."
-    fi
-    sudo brew services stop "$service"
+    brew services stop "$service"
 }
 
 #
