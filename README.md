@@ -7,7 +7,7 @@ macOS — without the two conflicting over ports and DNS.
 ## Requirements
 
 - macOS with [Homebrew](https://brew.sh) set up on a non-privileged port
-- larakit installed and configured for work projects
+- [Larakit](https://github.com/joerhodes/larakit) installed and configured for work projects
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/), ideally
   4.37+ for automatic start/stop support
 - [Laravel Herd](https://herd.laravel.com) installed for personal projects
