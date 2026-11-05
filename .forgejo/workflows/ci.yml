@@ -7,8 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: apt-get update && apt-get install -y shellcheck
-      - run: shellcheck --shell=bash environments/*.conf.sample addTestFramework.sh
-      - run: shellcheck --shell=bash -e SC1090 bin/devmode
+      - run: shellcheck --shell=bash bin/devmode environments/*.conf.sample addTestFramework.sh
 
   bats-bash32:
     runs-on: docker

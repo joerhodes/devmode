@@ -347,6 +347,7 @@ display_statuses() {
     local name
     for name in $envs; do
         echo "${name}:"
+        # shellcheck source=SCRIPTDIR/../environments/herd.conf.sample
         ( source "$DEVMODE_CONFIG_DIR/${name}.conf"; devmode_status )
         echo
     done
@@ -362,6 +363,7 @@ active_environments() {
     envs=$(list_environments)
 
     for name in $envs; do
+        # shellcheck source=SCRIPTDIR/../environments/herd.conf.sample
         if ( source "$DEVMODE_CONFIG_DIR/${name}.conf"; devmode_status ) &>/dev/null; then
             matches+=("$name")
         fi
@@ -386,6 +388,7 @@ stop_environments() {
     local overall=0
     for name in $active; do
         echo "Stopping ${name}..."
+        # shellcheck source=SCRIPTDIR/../environments/herd.conf.sample
         if ! ( source "$DEVMODE_CONFIG_DIR/${name}.conf"; devmode_down ); then
             echo "  Warning: devmode_down for ${name} did not exit cleanly." >&2
             overall=1
@@ -415,6 +418,7 @@ switch_environment() {
     fi
 
     echo "Starting ${target}..."
+    # shellcheck source=SCRIPTDIR/../environments/herd.conf.sample
     if ! ( source "$DEVMODE_CONFIG_DIR/${target}.conf"; devmode_up ); then
         echo "devmode_up for ${target} did not exit cleanly." >&2
         return 1
