@@ -1,8 +1,21 @@
 name: ci
 on: [push, pull_request]
+
 jobs:
-  test:
+  shellcheck:
     runs-on: docker
     steps:
       - uses: actions/checkout@v4
-      - run: echo "runner works" && uname -a
+      - run: apt-get update && apt-get install -y shellcheck
+      - run: shellcheck --shell=bash bin/devmode environments/*.conf.sample addTestFramework.sh
+
+  bats-bash32:
+    runs-on: docker
+    container:
+      image: bash:3.2
+    steps:
+      - run: apk add --no-cache git nodejs   # checkout needs Node
+      - uses: actions/checkout@v4
+      - run: bash --version                  # confirm 3.2
+      - run: bash addTestFramework.sh
+      - run: bash ./tests/bats/bin/bats test/
