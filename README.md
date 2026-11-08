@@ -16,8 +16,8 @@ macOS — without the two conflicting over ports and DNS.
 ## Installation
 
 ```bash
-tar -xzf devmode-v2.3.0.tar.gz
-cd devmode-v2.3.0
+tar -xzf devmode-v2.3.1.tar.gz
+cd devmode
 ./install.sh      # prompts for your password to write to /usr/local/bin
 ```
 

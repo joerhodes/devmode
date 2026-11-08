@@ -1,5 +1,5 @@
 .gitattributes  export-ignore
 .forgejo/       export-ignore
-test/           export-ignore
+tests/           export-ignore
 scripts/        export-ignore
 environments/*.conf  export-ignore
