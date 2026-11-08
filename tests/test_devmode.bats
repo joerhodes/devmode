@@ -6,6 +6,8 @@ setup() {
 
     DEVMODE_CONFIG_DIR="$TMPDIR"
 
+    DEVMODE_VERSION="2.3.0"
+
     load "${DEVMODE_BIN}/devmode"
 }
 

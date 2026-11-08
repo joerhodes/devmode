@@ -4,8 +4,6 @@ _common_setup() {
     load 'helpers/bats-file/load'
     load 'helpers/bats-mock/stub'
 
-    DEVMODE_VERSION="2.3.0"
-
     # get the directory for DEVMODE_HOME
     DEVMODE_HOME="$(cd -- "$(dirname -- "${BATS_TEST_FILENAME}")/.." && pwd -P)"
     DEVMODE_BIN="${DEVMODE_HOME}/bin"
