@@ -16,7 +16,7 @@
 # failures are checked explicitly - don't set errexit
 set -uo pipefail
 
-DEVMODE_VERSION="2.3.0"
+DEVMODE_VERSION="2.3.1"
 DEVMODE_CONFIG_DIR="${DEVMODE_CONFIG_DIR:-$HOME/.config/devmode}"
 
 #
