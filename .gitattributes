@@ -1,0 +1,4 @@
+.gitattributes  export-ignore
+.forgejo/       export-ignore
+test/           export-ignore
+environments/*.conf  export-ignore
