@@ -16,9 +16,9 @@ macOS — without the two conflicting over ports and DNS.
 ## Installation
 
 ```bash
-git clone https://github.com/joerhodes/devmode.git ~/projects/devmode
-sudo ln -s ~/projects/devmode/bin/devmode /usr/local/bin/devmode
-mkdir -p ~/.config/devmode/
+tar -xzf devmode-v2.3.0.tar.gz
+cd devmode-v2.3.0
+./install.sh      # prompts for your password to write to /usr/local/bin
 ```
 
 ## Usage
