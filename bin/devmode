@@ -23,7 +23,7 @@ DEVMODE_CONFIG_DIR="${DEVMODE_CONFIG_DIR:-$HOME/.config/devmode}"
 # Display usage information
 #
 usage() {
-    echo "Devmode version: v${DEVMODE_VERSION}"
+    echo "Version: v${DEVMODE_VERSION}"
     echo "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
     echo "       devmode list"
     echo "       devmode status"
@@ -441,7 +441,7 @@ main() {
             devmode::docker_desktop_quit
             ;;
         version)
-            echo "Devmode version: v${DEVMODE_VERSION}"
+            echo "v${DEVMODE_VERSION}"
             ;;
         help)
             usage
