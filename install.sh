@@ -43,4 +43,4 @@ SUDO=""
 $SUDO rm -f "$BIN_DIR/devmode"
 $SUDO install -m 755 bin/devmode "$BIN_DIR/devmode"
 
-echo "Installed devmode $("$BIN_DIR/devmode" version) to $BIN_DIR"
+echo "Installed $("$BIN_DIR/devmode" version) to $BIN_DIR"

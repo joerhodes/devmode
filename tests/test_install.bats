@@ -48,13 +48,18 @@ setup() {
 }
 
 @test "install copies devmode to bin dir" {
+    expectedVersion=$("${DEVMODE_HOME}"/bin/devmode version)
     assert_not_exists "${BIN_DIR}/devmode"
 
     run install.sh
     assert_success
 
-    assert_output "Installed devmode v2.3.0 to ${BIN_DIR}"
+    assert_output "Installed ${expectedVersion} to ${BIN_DIR}"
 
     assert_exists "${BIN_DIR}/devmode"
     assert_file_executable "${BIN_DIR}/devmode"
+
+    run "${BIN_DIR}"/devmode version
+    assert_success
+    assert_output "$expectedVersion"
 }

@@ -6,15 +6,12 @@ setup() {
 
     DEVMODE_CONFIG_DIR="$TMPDIR"
 
-    DEVMODE_VERSION="2.3.0"
-
     load "${DEVMODE_BIN}/devmode"
 }
 
 @test "usage displays help message" {
     run usage
     assert_success
-    assert_line --index 0 "Version: v${DEVMODE_VERSION}"
     assert_line --index 1 "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
     assert_line --index 2 "       devmode list"
     assert_line --index 3 "       devmode status"
@@ -24,7 +21,7 @@ setup() {
 @test "version displays expected version" {
     run main version
     assert_success
-    assert_output "v${DEVMODE_VERSION}"
+    [[ "$output" =~ ^devmode\ [0-9]+\.[0-9]+\.[0-9]+$ ]]
 }
 
 @test "display status line displays up status" {

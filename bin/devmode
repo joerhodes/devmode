@@ -441,7 +441,7 @@ main() {
             devmode::docker_desktop_quit
             ;;
         version)
-            echo "v${DEVMODE_VERSION}"
+            echo "devmode ${DEVMODE_VERSION}"
             ;;
         help)
             usage
