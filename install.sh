@@ -5,7 +5,7 @@
 #
 set -euo pipefail
 
-if [[ $EUID -eq 0 ]]; then
+if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" ]]; then
   echo "Run install.sh as your normal user; it will ask for sudo only when needed." >&2
   exit 1
 fi
