@@ -16,12 +16,14 @@
 # failures are checked explicitly - don't set errexit
 set -uo pipefail
 
+DEVMODE_VERSION="2.3.0"
 DEVMODE_CONFIG_DIR="${DEVMODE_CONFIG_DIR:-$HOME/.config/devmode}"
 
 #
 # Display usage information
 #
 usage() {
+    echo "Version: v${DEVMODE_VERSION}"
     echo "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
     echo "       devmode list"
     echo "       devmode status"
@@ -437,6 +439,9 @@ main() {
         stop)
             stop_environments
             devmode::docker_desktop_quit
+            ;;
+        version)
+            echo "devmode ${DEVMODE_VERSION}"
             ;;
         help)
             usage

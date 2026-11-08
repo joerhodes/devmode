@@ -12,10 +12,16 @@ setup() {
 @test "usage displays help message" {
     run usage
     assert_success
-    assert_line --index 0 "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
-    assert_line --index 1 "       devmode list"
-    assert_line --index 2 "       devmode status"
-    assert_line --index 3 "       devmode stop"
+    assert_line --index 1 "Usage: devmode <environment>   e.g. devmode herd | devmode larakit"
+    assert_line --index 2 "       devmode list"
+    assert_line --index 3 "       devmode status"
+    assert_line --index 4 "       devmode stop"
+}
+
+@test "version displays expected version" {
+    run main version
+    assert_success
+    [[ "$output" =~ ^devmode\ [0-9]+\.[0-9]+\.[0-9]+$ ]]
 }
 
 @test "display status line displays up status" {

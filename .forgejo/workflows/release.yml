@@ -1,0 +1,14 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  version-check:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches DEVMODE_VERSION and README
+        env:
+          TAG: ${{ github.ref_name }}
+        run: scripts/check_version.sh "$TAG"
