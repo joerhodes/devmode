@@ -12,3 +12,27 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: scripts/check_version.sh "$TAG"
+
+  bats-bash32:
+    needs: version-check
+    runs-on: docker
+    container:
+      image: bash:3.2
+    steps:
+      - run: apk add --no-cache git nodejs
+      - uses: actions/checkout@v4
+      - run: bash addTestFramework.sh
+      - run: bash ./tests/bats/bin/bats tests
+
+  publish:
+    needs: bats-bash32
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - run: apt-get update && apt-get install -y curl jq
+      - name: Create Forgejo release
+        env:
+          TAG: ${{ github.ref_name }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+        run: scripts/create_release.sh
